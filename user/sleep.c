@@ -14,7 +14,7 @@ void main(int argc, char *argv[]){
         sleep(num);
     }
     else{
-        printf("Error! You input too much parameter or no parameter.\n");
+        printf("Error! You input too much argument or no argument.\n");
     }
     exit(0);
 }
