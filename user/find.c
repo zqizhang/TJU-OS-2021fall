@@ -5,7 +5,7 @@
 #include "kernel/fs.h"
 
 char* fmtname(char *path){
-    static char buf[DIRSIZ+1];
+    static char buf[DIRSIZ + 1];
     char *p;
 
     // Find first character after last slash.
@@ -27,12 +27,12 @@ void find(char *path, char* filename){
     struct stat st;
 
     if((fd = open(path, 0)) < 0){
-        fprintf(2, "ls: cannot open %s\n", path);
+        fprintf(2, "find: cannot open %s\n", path);
         return;
     }
 
     if(fstat(fd, &st) < 0){
-        fprintf(2, "ls: cannot stat %s\n", path);
+        fprintf(2, "find: cannot stat %s\n", path);
         close(fd);
         return;
     }
