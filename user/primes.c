@@ -41,9 +41,9 @@ void primes(int *array, int num){
             }
         }
         primes(array - ans, ans);
+        wait(0);
         exit(0);
     }
-
     wait(0);
 }
 
