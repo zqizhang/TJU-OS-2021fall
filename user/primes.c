@@ -54,6 +54,6 @@ void main(int argc, char* argv){
         array[i] = i + 2;
     }
     primes(array, num - 1);
-
+    wait(0);
     exit(0);
 }
