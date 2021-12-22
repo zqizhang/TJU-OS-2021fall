@@ -146,6 +146,8 @@ void            trapinithart(void);
 extern struct spinlock tickslock;
 void            usertrapret(void);
 
+int             lazy_allocate(uint64, struct proc*);
+
 // uart.c
 void            uartinit(void);
 void            uartintr(void);

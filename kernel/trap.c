@@ -29,6 +29,26 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+int lazy_allocate(uint64 va, struct proc *p){
+  char *mem;
+  mem = kalloc();
+  if(mem == 0){
+    return -1;
+  }
+  else if(va >= p->sz || va < PGROUNDUP(p->trapframe->sp)){
+    kfree(mem);
+    return -1;
+  }
+  else{
+    memset(mem, 0, PGSIZE);
+    if(mappages(p->pagetable, va, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+      kfree(mem);
+      return -1;
+    }
+  }
+  return 0;
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -67,7 +87,16 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }  
+  else if(r_scause() == 13 || r_scause() == 15){
+    uint64 fault_address = r_stval();
+    uint64 va = PGROUNDDOWN(fault_address);
+
+    if(lazy_allocate(va, p) == -1)
+      p->killed = 1;
+  }
+  
+  else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
