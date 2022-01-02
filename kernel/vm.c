@@ -318,9 +318,10 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
+
     pa = PTE2PA(*pte);
     // Clear PTE_W in the PTEs of both child and parent.
-    *pte &= ~PTE_W; 
+    *pte &= (~PTE_W); 
     *pte |= PTE_COW;
     flags = PTE_FLAGS(*pte);
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
@@ -360,6 +361,8 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
 
+    if(va0 >= MAXVA)
+    return -1;
     pte_t* pte = walk(pagetable, va0, 0);
     if(pte && (*pte & PTE_COW) != 0){
       // when cow page
@@ -455,6 +458,13 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 int cow_allocate(uint64 va, pagetable_t page){
   // copy PTE from process which fault from 
   pte_t *pte = walk(page, va, 0);
+  if(va > MAXVA)
+    return -1;
+  if(pte == 0)
+    return -1;
+  if(((*pte) & (PTE_V)) == 0)
+    return -1;
+
   uint64 pa = PTE2PA(*pte);
   uint flags = PTE_FLAGS(*pte);
   
@@ -469,24 +479,28 @@ int cow_allocate(uint64 va, pagetable_t page){
       ref_release(pa);
       return -1;
     }
+
+    memmove(mem, (char*)pa, PGSIZE);
     // install the new page in the PTE with PTE_W set.
     *pte &= ~PTE_COW; 
     *pte |= PTE_W;
+    *pte &= (~PTE_V);
     flags = PTE_FLAGS(*pte);
-    memmove(mem, (char*)pa, PGSIZE);
   
-    if(mappages(page, va, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+    if(mappages(page, va, PGSIZE, (uint64)mem, flags) != 0){
       kfree(mem);
       ref_release(pa);
       return -1;
     }
-    ref_downcnt(pa, -1);
     ref_release(pa);
+    kfree((char*)PGROUNDDOWN(pa));
+
     return 0;
+
   }
   else{
     *pte |= PTE_W;
-    *pte &= ~PTE_COW;
+    *pte &= (~PTE_COW);
     ref_release(pa);
     return 0;
   }

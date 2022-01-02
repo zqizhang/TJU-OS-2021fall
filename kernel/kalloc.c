@@ -26,7 +26,7 @@ struct {
 struct {
   struct spinlock lock;
   int count;
-}ref[(PHYSTOP - KERNBASE)/PGSIZE];
+}ref[PHYSTOP / PGSIZE];
 
 void
 kinit()
@@ -44,9 +44,9 @@ freerange(void *pa_start, void *pa_end)
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE){
-    kfree(p);
     // init reference count of every page 
-    ref[(uint64)(p - KERNBASE) / PGSIZE].count = 1;  
+    ref[(uint64)p / PGSIZE].count = 1;  
+    kfree(p);
   }
 }
 
@@ -62,7 +62,7 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  uint64 page_index = ((uint64)pa - KERNBASE) / PGSIZE;
+  uint64 page_index = (uint64)pa / PGSIZE;
   acquire(&ref[page_index].lock);
   ref[page_index].count--;
   // release memory only when reference count is 0
@@ -97,9 +97,9 @@ kalloc(void)
   if(r){
     kmem.freelist = r->next;
     // init the ref of new page
-    acquire(&ref[((uint64)r- KERNBASE) / PGSIZE].lock);
-    ref[((uint64)r- KERNBASE) / PGSIZE].count = 1;
-    release(&ref[((uint64)r- KERNBASE) / PGSIZE].lock);
+    acquire(&ref[(uint64)r/ PGSIZE].lock);
+    ref[(uint64)r / PGSIZE].count = 1;
+    release(&ref[(uint64)r / PGSIZE].lock);
   }
   release(&kmem.lock);
 
@@ -110,27 +110,25 @@ kalloc(void)
 
 
 void ref_acquire(uint64 pa){
-  acquire(&ref[(pa - KERNBASE) / PGSIZE].lock);
+  acquire(&ref[pa / PGSIZE].lock);
 }
 
 void ref_release(uint64 pa){
-  release(&ref[(pa - KERNBASE) / PGSIZE].lock);
+  release(&ref[pa / PGSIZE].lock);
 }
 
 int ref_getcnt(uint64 pa){
-  return ref[(pa - KERNBASE) / PGSIZE].count;
+  return ref[pa / PGSIZE].count;
 }
 
 void ref_addcnt(uint64 pa, int n){
-  acquire(&ref[(pa - KERNBASE) / PGSIZE].lock);
-  ref[(pa - KERNBASE) / PGSIZE].count += n;
-  release(&ref[(pa - KERNBASE) / PGSIZE].lock);
+  acquire(&ref[pa / PGSIZE].lock);
+  ref[pa / PGSIZE].count += n;
+  release(&ref[pa / PGSIZE].lock);
 }
 
 void ref_downcnt(uint64 pa, int n){
-  acquire(&ref[(pa - KERNBASE) / PGSIZE].lock);
-  ref[(pa - KERNBASE) / PGSIZE].count -= n;
-  release(&ref[(pa - KERNBASE) / PGSIZE].lock);
+  acquire(&ref[pa / PGSIZE].lock);
+  ref[pa / PGSIZE].count -= n;
+  release(&ref[pa / PGSIZE].lock);
 }
-
-
