@@ -64,6 +64,12 @@ void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
 
+void            ref_acquire(uint64);
+void            ref_release(uint64);
+int             ref_getcnt(uint64);
+void            ref_addcnt(uint64, int);
+void            ref_downcnt(uint64, int);
+
 // log.c
 void            initlog(int, struct superblock*);
 void            log_write(struct buf*);
@@ -171,6 +177,8 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
+
+int             cow_allocate(uint64, pagetable_t );
 
 // plic.c
 void            plicinit(void);

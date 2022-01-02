@@ -311,7 +311,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  // char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -319,14 +319,14 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
+    // Clear PTE_W in the PTEs of both child and parent.
+    *pte &= ~PTE_W; 
+    *pte |= PTE_COW;
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
       goto err;
     }
+    ref_addcnt(pa, 1);
   }
   return 0;
 
@@ -359,6 +359,16 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
+
+    pte_t* pte = walk(pagetable, va0, 0);
+    if(pte && (*pte & PTE_COW) != 0){
+      // when cow page
+      if(cow_allocate(va0, pagetable) != 0){
+        return -1;
+      }
+    }
+    pa0 = walkaddr(pagetable, va0);
+
     if(pa0 == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
@@ -438,5 +448,46 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return 0;
   } else {
     return -1;
+  }
+}
+
+
+int cow_allocate(uint64 va, pagetable_t page){
+  // copy PTE from process which fault from 
+  pte_t *pte = walk(page, va, 0);
+  uint64 pa = PTE2PA(*pte);
+  uint flags = PTE_FLAGS(*pte);
+  
+  if(!(flags & PTE_COW)){
+    printf("cow_allocate: not a cow page");
+    return -1;
+  }
+  ref_acquire(pa);
+  if(ref_getcnt(pa) > 1){
+    char *mem = kalloc();
+    if(mem == 0){
+      ref_release(pa);
+      return -1;
+    }
+    // install the new page in the PTE with PTE_W set.
+    *pte &= ~PTE_COW; 
+    *pte |= PTE_W;
+    flags = PTE_FLAGS(*pte);
+    memmove(mem, (char*)pa, PGSIZE);
+  
+    if(mappages(page, va, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+      kfree(mem);
+      ref_release(pa);
+      return -1;
+    }
+    ref_downcnt(pa, -1);
+    ref_release(pa);
+    return 0;
+  }
+  else{
+    *pte |= PTE_W;
+    *pte &= ~PTE_COW;
+    ref_release(pa);
+    return 0;
   }
 }
