@@ -322,7 +322,8 @@ sys_open(void)
     return -1;
   }
 
-  if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){      int cycle = 0;
+  if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){      
+    int cycle = 0;
     char target[MAXPATH];
     while(ip->type == T_SYMLINK){
       if(cycle == 10){
