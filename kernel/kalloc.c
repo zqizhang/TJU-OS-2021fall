@@ -126,9 +126,3 @@ void ref_addcnt(uint64 pa, int n){
   ref[pa / PGSIZE].count += n;
   release(&ref[pa / PGSIZE].lock);
 }
-
-void ref_downcnt(uint64 pa, int n){
-  acquire(&ref[pa / PGSIZE].lock);
-  ref[pa / PGSIZE].count -= n;
-  release(&ref[pa / PGSIZE].lock);
-}
